@@ -18,16 +18,42 @@ spec:
         app: devops-platform
 
     spec:
+      volumes:
+      - name: secret-volume
+        secret:
+          secretName: devops-platform-secret
+
       imagePullSecrets:
         - name: ghcr-secret
       containers:
         - name: devops-platform
           image: ghcr.io/grim-82/devops-platform:1.0.0
           imagePullPolicy: Always
-
           ports:
             - name: http
               containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: devops-platform-config
+          env:
+          - name: DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: devops-platform-secret
+                key: DB_USERNAME
+          volumeMounts:
+          - name: secret-volume
+            mountPath: /etc/secrets
+            readOnly: true
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
 
           livenessProbe:
             httpGet:

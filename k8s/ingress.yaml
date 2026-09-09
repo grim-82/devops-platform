@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: devops-platform
+spec:
+  ingressClassName: traefik
+  
+  tls:
+  - hosts:
+    - devops-platform.local
+    secretName: devops-platform-tls
+
+  rules:
+    - host: devops-platform.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: devops-platform
+                port:
+                  number: 80
