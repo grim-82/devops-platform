@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: client-egress-policy
+  namespace: dev
+
+spec:
+  podSelector:
+    matchLabels:
+      run: test-client
+
+  policyTypes:
+    - Egress
+
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              run: test-nginx
+      ports:
+        - protocol: TCP
+          port: 80
