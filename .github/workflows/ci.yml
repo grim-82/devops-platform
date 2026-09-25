@@ -37,3 +37,10 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -f docker/Dockerfile -t devops-platform:ci-test .
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
