@@ -36,7 +36,8 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -f docker/Dockerfile -t devops-platform:ci-test .
+          docker build -f docker/Dockerfile \
+            -t ghcr.io/grim-82/devops-platform:${{ github.sha }} . 
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
