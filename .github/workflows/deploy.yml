@@ -40,7 +40,16 @@ jobs:
           kubectl auth whoami
           kubectl auth can-i patch deployments
           kubectl auth can-i get pods
-          kubectl auth can-i get secrets
+
+          result=$(kubectl auth can-i get secrets || true)
+
+          if [ "$result" != "no" ]; then
+            echo "ERROR: cd-deployer unexpectedly has access to secrets"
+            exit 1
+          fi
+
+          echo "OK: cd-deployer cannot access secrets"
+
 
       - name: Deploy image
         run: |
