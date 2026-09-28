@@ -1,0 +1,57 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Kubernetes
+        env:
+          KUBE_SERVER: ${{ secrets.KUBE_SERVER }}
+          KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
+          KUBE_CA_CERT: ${{ secrets.KUBE_CA_CERT }}
+        run: |
+          echo "$KUBE_CA_CERT" | base64 -d > /tmp/kube-ca.crt
+
+          kubectl config set-cluster devops-k3s \
+            --server="$KUBE_SERVER" \
+            --certificate-authority=/tmp/kube-ca.crt
+
+          kubectl config set-credentials cd-deployer \
+            --token="$KUBE_TOKEN"
+
+          kubectl config set-context devops-k3s \
+            --cluster=devops-k3s \
+            --user=cd-deployer \
+            --namespace=default
+
+          kubectl config use-context devops-k3s
+
+      - name: Verify Kubernetes access
+        run: |
+          kubectl auth whoami
+          kubectl auth can-i patch deployments
+          kubectl auth can-i get pods
+          kubectl auth can-i get secrets
+
+      - name: Deploy image
+        run: |
+          kubectl set image deployment/devops-platform \
+            devops-platform=ghcr.io/grim-82/devops-platform:${GITHUB_SHA}
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/devops-platform --timeout=120s
+
+      - name: Verify deployed image
+        run: |
+          kubectl get deployment devops-platform \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
