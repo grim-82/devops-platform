@@ -7,3 +7,8 @@ __pycache__/
 .DS_Store
 k8s/secret.yaml
 actions-runner/
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/terraform.tfvars
+terraform/data/
