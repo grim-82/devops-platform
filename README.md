@@ -37,9 +37,9 @@ flowchart TD
 
     subgraph CI [CI Pipeline]
         GHA[GitHub Actions]
-        TEST [Run pytest]
-        BUILD [Build Docker Image]
-        REG [Publish Image to GHCR]
+        TEST[Run pytest]
+        BUILD[Build Docker Image]
+        REG[Publish Image to GHCR]
 
         GHA --> TEST
         TEST --> BUILD
@@ -47,11 +47,11 @@ flowchart TD
     end
 
     subgraph K8S [Local Kubernetes - k3s]
-        DEP [Deployment]
-        POD [Application Pods]
-        SVC [ClusterIP Service]
-        ING [Traefik Ingress]
-        TLS [HTTPS - Self-signed TLS]
+        DEP[Deployment]
+        POD[Application Pods]
+        SVC[ClusterIP Service]
+        ING[Traefik Ingress]
+        TLS["HTTPS - Self-signed TLS"]
 
         DEP --> POD
         POD --> SVC
@@ -62,7 +62,7 @@ flowchart TD
     DEV --> REPO
     REPO --> GHA
     REG --> DEP
-    CLIENT [Client] --> TLS
+    CLIENT[Client] --> TLS
 ```
 This diagram shows the high-level project workflow. Refer to the actual workflow files for exact triggers, permissions, image tags, and deployment automation.
 
