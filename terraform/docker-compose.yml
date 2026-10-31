@@ -5,3 +5,6 @@ services:
       - "4566:4566"
     volumes:
       - ./data:/app/data
+    environment:
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      FLOCI_STORAGE_SERVICES_S3_MODE: persistent
