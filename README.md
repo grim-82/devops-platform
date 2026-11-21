@@ -1,8 +1,8 @@
-# Devops-platform
+# DevOps-platform
 
-A personal DevOps portfolio project demonstrating Docker containerization, GitHub Actions CI automation, container image publishing, Kubernetes deployment, access control, and Terraform module practice in a local lab environment.
+A personal DevOps portfolio project demonstrating Docker containerization, GitHub Actions CI automation, container image publishing, Kubernetes deployment, access control, and Infrastructure as Code using Terraform in local and real AWS lab environments.
 
-> **Project scope:** This is a personal learning and portfolio project, not commercial DevOps experience. Kubernetes was deployed to a local `k3s` cluster. Terraform S3 module practice used Floci, a local AWS-compatible environment; this is not evidence of deployment to real AWS.
+> **Project scope:** This is a personal learning and portfolio project, not commercial DevOps experience. Kubernetes was deployed to a local `k3s` cluster. Terraform module practice was performed using Floci, a local AWS-compatible environment. A separate Terraform lab was deployed and validated in a real AWS account. These are learning exercises, not production or commercial deployments.
 
 ## Project Goals
 
@@ -12,6 +12,8 @@ A personal DevOps portfolio project demonstrating Docker containerization, GitHu
 - Deploy the application to a local Kubernetes (`k3s`) cluster.
 - Demonstrate health checks, resource controls, Ingress/TLS, and least-privilege RBAC.
 - Practise reusable Terraform modules and safe resource refactoring.
+- Build and validate AWS network infrastructure using Terraform.
+- Practise remote Terraform state management using an encrypted and versioned S3 backend.
 
 ## Technology Stack
 
@@ -27,9 +29,12 @@ A personal DevOps portfolio project demonstrating Docker containerization, GitHu
 | Reliability | Readiness/liveness probes, CPU and memory requests/limits |
 | Access Control | ServiceAccounts, Roles, RoleBindings, Kubernetes RBAC |
 | Infrastructure as Code | Terraform, modules, variables, outputs, lifecycle rules, `moved` block |
+| AWS Infrastructure | VPC, Subnets, Internet Gateway, Route Tables, Security Groups |
+| Terraform Backend | Amazon S3 remote backend, versioning, encryption, state locking |
 | Local Cloud-Compatible Practice | Floci |
 
 ## Architecture
+
 ```mermaid
 flowchart TD
     DEV[Developer]
@@ -64,7 +69,8 @@ flowchart TD
     REG --> DEP
     CLIENT[Client] --> TLS
 ```
-This diagram shows the high-level project workflow. Refer to the actual workflow files for exact triggers, permissions, image tags, and deployment automation.
+
+This diagram shows the application workflow. The AWS VPC lab is a separate infrastructure exercise and is documented in the Terraform section below. Refer to the actual workflow files and Terraform configuration for exact implementation details.
 
 ## Application
 
@@ -181,7 +187,7 @@ Terraform state can contain infrastructure metadata and sensitive values. Real o
 
 ## Terraform Module Practice
 
-Terraform practice focused on a reusable S3 bucket module, module inputs and outputs, lifecycle safeguards, and resource refactoring with a `moved` block.
+Terraform module practice focused on a reusable S3 bucket module, module inputs and outputs, lifecycle safeguards, and resource refactoring with a `moved` block.
 
 The refactoring plan was verified as:
 
@@ -191,7 +197,168 @@ Plan: 0 to add, 0 to change, 0 to destroy.
 
 This demonstrated that the resource-address refactor in that exercise did not plan resource recreation.
 
-> **Environment limitation:** this exercise used Floci as a local AWS-compatible environment. It does not prove that the same configuration has been deployed or validated in a real AWS account. Real AWS behaviour, IAM permissions, backend configuration, and service support require separate validation.
+The initial module practice used **Floci**, a local AWS-compatible environment. Floci is kept separate from the real AWS lab and is not a substitute for validating infrastructure in AWS.
+
+## AWS Terraform VPC Lab
+
+A separate networking lab was deployed to a real AWS account using Terraform.
+
+**Region:** `eu-west-1` (Ireland)
+
+**Purpose:** Practise AWS VPC networking, subnet segmentation, route tables, Internet Gateway configuration, Security Groups, and remote Terraform state management.
+
+### Network Architecture
+
+The lab contains one VPC with a CIDR range of `10.0.0.0/16`.
+
+| Resource | CIDR / Configuration | Availability Zone |
+|---|---|---|
+| VPC | `10.0.0.0/16` | `eu-west-1` (Ireland) |
+| Public Subnet A | `10.0.1.0/24` | `eu-west-1a` |
+| Public Subnet B | `10.0.2.0/24` | `eu-west-1b` |
+| Private Subnet A | `10.0.11.0/24` | `eu-west-1a` |
+| Private Subnet B | `10.0.12.0/24` | `eu-west-1b` |
+
+The public and private subnets are distributed across two Availability Zones.
+
+### Public Network
+
+The public subnets are associated with a dedicated public route table.
+
+The public route table contains:
+
+| Destination | Target | Purpose |
+|---|---|---|
+| `10.0.0.0/16` | `local` | Internal VPC communication |
+| `0.0.0.0/0` | Internet Gateway | Default IPv4 route towards the internet |
+
+An Internet Gateway is attached to the VPC.
+
+Public subnets have `map_public_ip_on_launch = true`.
+
+A route to an Internet Gateway is necessary for public IPv4 internet connectivity, but it does not by itself guarantee connectivity. A workload also needs an appropriate public IP address and permissive Security Group and Network ACL rules.
+
+### Private Network
+
+The private subnets are associated with a separate private route table.
+
+The private route table contains only the VPC local route:
+
+| Destination | Target | Purpose |
+|---|---|---|
+| `10.0.0.0/16` | `local` | Internal VPC communication |
+
+Private subnets have `map_public_ip_on_launch = false`.
+
+No default route to the Internet Gateway or NAT Gateway is configured. Therefore, these subnets do not have a direct IPv4 internet route in this lab configuration.
+
+A NAT Gateway was intentionally not created to avoid unnecessary ongoing lab costs.
+
+### Security Group
+
+A Security Group was created for public lab resources.
+
+| Direction | Protocol | Port | Source / Destination |
+|---|---|---|---|
+| Inbound | TCP | 80 | `0.0.0.0/0` |
+| Inbound | TCP | 443 | `0.0.0.0/0` |
+| Inbound | SSH (TCP) | 22 | Not allowed |
+| Outbound | All traffic | All | `0.0.0.0/0` |
+
+HTTP and HTTPS ingress are open to all IPv4 addresses for this lab configuration. SSH ingress was deliberately not enabled.
+
+Security Groups are stateful: response traffic for an allowed connection is automatically permitted.
+
+### Terraform Remote Backend
+
+The lab uses an Amazon S3 remote backend for Terraform state.
+
+The backend bucket is configured with:
+
+- S3 bucket versioning.
+- Server-side encryption using SSE-S3 (AES-256).
+- S3 Block Public Access.
+- S3 state locking with `use_lockfile = true`.
+
+The VPC lab state is stored under a separate key in the backend bucket. The bootstrap configuration that manages the backend bucket keeps its own state separate.
+
+Terraform state files and temporary backend lock files (`*.tflock`) are not committed to Git. Terraform provider dependency lock files (`.terraform.lock.hcl`) are committed to ensure consistent provider versions.
+
+### Validation
+
+The infrastructure was applied using Terraform and verified using both Terraform and AWS CLI.
+
+Confirmed checks included:
+
+- VPC existence and CIDR configuration.
+- Four subnet CIDR ranges, Availability Zones, and public IP assignment settings.
+- Internet Gateway attachment to the VPC.
+- Public route table default route through the Internet Gateway.
+- Private route table containing only the local route.
+- Associations between all four subnets and their intended route tables.
+- Security Group ingress and egress rules.
+- Terraform state containing the expected resources.
+
+The final Terraform plan reported:
+
+```text
+No changes. Your infrastructure matches the configuration.
+```
+
+This confirms that Terraform configuration and the observed AWS infrastructure matched at the time of validation.
+
+### Reproduce and Inspect
+
+Run the commands from the AWS lab directory:
+
+```bash
+cd terraform/labs/01-vpc
+```
+
+Authenticate using the configured AWS CLI SSO profile:
+
+```bash
+aws sso login --profile devops-platform
+aws sts get-caller-identity --profile devops-platform
+```
+
+Initialize Terraform and inspect the state:
+
+```bash
+terraform init
+terraform state list
+```
+
+Validate and inspect the planned infrastructure:
+
+```bash
+terraform fmt -check
+terraform validate
+terraform plan
+```
+
+Inspect VPCs and subnets:
+
+```bash
+aws ec2 describe-vpcs \
+  --filters "Name=tag:Project,Values=devops-platform" \
+  --profile devops-platform
+
+aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=<VPC_ID>" \
+  --profile devops-platform
+```
+
+Replace `<VPC_ID>` with the VPC ID from the previous command.
+
+### Lab Limitations
+
+- This is a learning lab in a real AWS account, not a production deployment.
+- No EC2 instances or application workloads were deployed in this VPC.
+- No NAT Gateway was created.
+- End-to-end application connectivity and public internet access were not tested.
+- The Security Group rules are demonstration settings and should be restricted appropriately for real workloads.
+- AWS resource costs depend on the services and resources deployed. The lab avoids EC2 and NAT Gateway charges, but this should not be interpreted as a guarantee of zero AWS costs.
 
 ## Troubleshooting
 
@@ -231,17 +398,19 @@ Useful evidence for reviewers includes:
 - The GHCR package/image corresponding to the documented version or tag.
 - Kubernetes manifests for Deployment, Service, Ingress, probes, resource controls, and RBAC.
 - Sanitized rollout output and successful health checks.
-- Terraform configuration and plan output demonstrating the `moved`-block refactor.
+- Terraform module configuration and plan output demonstrating the `moved`-block refactor.
+- AWS VPC Terraform configuration, route table definitions, and sanitized validation output.
+- Terraform plan output confirming that the AWS infrastructure matches the configuration.
 
-Only add badges or screenshots that point to real, current results. Never include tokens, credentials, private keys, or sensitive account details.
+Only add badges or screenshots that point to real, current results. Never include tokens, credentials, private keys, account identifiers, or sensitive state information.
 
 ## Known Limitations
 
 - Kubernetes runs in a local `k3s` lab, not a managed production cluster.
 - Local Ingress uses a self-signed TLS certificate.
 - Monitoring components were tested in the constrained lab, but the monitoring stack was removed and is not presented as a continuously running service.
-- AWS services and architecture have been studied; a real AWS deployment is not claimed.
-- Floci is intended for local AWS-compatible practice and is not a substitute for validation in real AWS.
+- Floci is used for local AWS-compatible Terraform practice and is not a substitute for validation in real AWS.
+- The AWS VPC lab is a separate educational deployment. It does not include EC2 workloads, NAT Gateway, or end-to-end application connectivity testing.
 - This is a personal portfolio project, not commercial DevOps employment.
 
 ## Links
@@ -249,4 +418,4 @@ Only add badges or screenshots that point to real, current results. Never includ
 - **GitHub Profile:** https://github.com/grim-82
 - **Project Repository:** https://github.com/grim-82/devops-platform
 
-Keep this README aligned with the current source code, workflow files, Kubernetes manifests, test results, and actual lab state.
+Keep this README aligned with the current source code, workflow files, Kubernetes manifests, test results, Terraform configuration, and actual lab state.
