@@ -7,3 +7,21 @@ variable "bucket_name" {
     error_message = "bucket_name must contain at least 3 characters."
   }
 }
+
+variable "enable_versioning" {
+  description = "Enable S3 bucket versioning"
+  type        = bool
+  default     = false
+}
+
+variable "enable_encryption" {
+  description = "Enable server-side encryption"
+  type        = bool
+  default     = false
+}
+
+variable "block_public_access" {
+  description = "Block all public access to the bucket"
+  type        = bool
+  default     = false
+}
